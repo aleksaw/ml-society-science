@@ -51,7 +51,7 @@ class NameBanker:
         # Choose alpha
         if print_progress: print("Choosing parameter 1/5")
         n_folds = 10
-        alphas = np.logspace(-5, -3, 11)
+        alphas = np.logspace(-5, 0, 21)
         accuracies = np.zeros(len(alphas))
         deviations = np.zeros(len(alphas))
         i = 0
@@ -80,7 +80,8 @@ class NameBanker:
                              (50, 30), (70, 30), (100, 30),
                              (50, 50), (70, 50), (100, 50),
                              (50, 70), (70, 70), (100, 70),
-                             (50, 30, 10), (70, 30, 10), (100, 30, 10)]
+                             (50, 30, 10), (70, 30, 10), (100, 30, 10),
+                             (16, 4, 2)]
         accuracies = np.zeros(len(hidden_components))
         deviations = np.zeros(len(hidden_components))
         i = 0
@@ -268,16 +269,16 @@ class NameBanker:
             self.fit(self.X, self.y)
         return
 
-    # Predict the probability of failure for a specific person with data x
+    # Predict the probability of repayment for a specific person with data x
     def predict_proba(self, x):
         x = self.scaler.transform(x.reshape(1, -1))
         x_pca = self.pca.transform(x)[:, :self.lr_components]
         mlp_prob = self.classifiers[0].predict_proba(x)
         log_prob = self.classifiers[1].predict_proba(x_pca)
         knn_prob = self.classifiers[2].predict_proba(x)
-        return (mlp_prob[0,1] * self.method_weights[0] +
-                log_prob[0,1] * self.method_weights[1] +
-                knn_prob[0,1] * self.method_weights[2])
+        return (mlp_prob[0,0] * self.method_weights[0] +
+                log_prob[0,0] * self.method_weights[1] +
+                knn_prob[0,0] * self.method_weights[2])
 
     # THe expected utility of granting the loan or not. Here there are two actions:
     # action = 0 do not grant the loan
@@ -302,4 +303,4 @@ class NameBanker:
     def get_best_action(self, x):
         # Convert Dataframe to array
         x = x.values
-        return 1 if self.expected_utility(x,1)>self.expected_utility(x,0) else 2
+        return 1 if self.expected_utility(x,1) >= self.expected_utility(x,0) else 0
