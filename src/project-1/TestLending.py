@@ -137,6 +137,7 @@ import random_banker
 decision_maker = random_banker.RandomBanker()
 interest_rate = 0.005
 
+### Do a number of preliminary tests by splitting the data in parts
 from sklearn.model_selection import train_test_split
 n_tests = 10
 print("Start Random Banker")
