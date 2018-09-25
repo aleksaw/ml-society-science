@@ -10,7 +10,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from scipy import stats
 
 class NameBanker:
-    def __init__(self):
+    def __init__(self, default_parameters=False):
         # Instance variables
         # Data
         self.X = np.array([[0]])
@@ -21,17 +21,21 @@ class NameBanker:
         # Classifiers
         # self.classifiers
         # Parameters
-        self.parameters_set = False
-        self.lr_components = 10
+        self.parameters_set = default_parameters
+        self.lr_components = 40
         self.nn_alpha = 1e-4
         self.nn_hidden_components = (70)
         self.knn_k = 40
-        self.method_weights = np.array([0,0,1])#np.ones(3) / 3
+        self.method_weights = np.array([0.1,0.4,0.5])#np.ones(3) / 3
         # Interest rate
         self.rate = 0.005
         # Interesting X indices (perhaps these ought to be passed as arguments)
         self.ix_amount = 4
         self.ix_duration = 1
+
+    @staticmethod
+    def utility(loan, rate, time, outcome):
+        return loan * (((1+rate)**time - 1) if outcome == 1 else -1)
 
     def __choose_parameters(self, print_progress=False):
         if print_progress: print("Choosing parameters")
@@ -42,8 +46,6 @@ class NameBanker:
         X_test = scaler.fit_transform(X_test)
         n_features = np.shape(self.X)[1]
 
-        def utility(loan, rate, time, outcome):
-            return loan * (-1 if outcome==2 else (1+rate)**time - 1)
         def expected_utility(loan, rate, time, prob):
             return loan * (prob * (1+rate)**time - 1)
 
@@ -203,7 +205,7 @@ class NameBanker:
                 loan, time = X_test_unscaled[i, (self.ix_amount, self.ix_duration)]
                 loan /= max_loan
                 prob = probabilities[i, :] if y_test[i] == 1 else 1-probabilities[i, :]
-                util = np.array([utility(loan, self.rate, time, y_test[i])
+                util = np.array([self.utility(loan, self.rate, time, y_test[i])
                                  if eu > 0 else 0
                                  for eu in expected_utility(loan, self.rate, time, prob)])
 
@@ -228,7 +230,7 @@ class NameBanker:
                 loan, time = X_test_unscaled[i, (self.ix_amount, self.ix_duration)]
                 prob = probabilities[i, :] if y_test[i] == 1 else 1-probabilities[i, :]
                 prob = prob @ weights.T
-                weighing_utility[n, :] += np.array([utility(loan, self.rate, time, y_test[i])
+                weighing_utility[n, :] += np.array([self.utility(loan, self.rate, time, y_test[i])
                                                     if eu > 0 else 0
                                                     for eu in expected_utility(loan, self.rate, time, prob)])
 
@@ -261,7 +263,30 @@ class NameBanker:
                                           fit(X, y),
                             LogisticRegression().fit(X_pca, y),
                             KNeighborsClassifier(n_neighbors=self.knn_k).fit(X, y)]
+    def private_fit(self, X, y, epsilon, numerical_features, binary_features, set_params=False):
+        n_data = len(X)
+        k = len(numerical_features) + len(binary_features)
 
+        flip_fraction = 1 / (1 + np.exp(epsilon/k))
+        # All non-numerical features are binary.
+        # What fraction should we flip to be epsilon-DP, given that there are k attributes in total?
+        # If we want to be epsilon-DP overall, then each feature should be \epsilon / k - DP.
+
+        # We can use the same random response mechanism for all binary features
+        w = np.random.choice([0, 1],
+                             size=(n_data, len(binary_features)),
+                             p=[1 - flip_fraction, flip_fraction])
+        X[binary_features] = (X[binary_features] + w) % 2
+
+        # For numerical features, it is different.
+        # The scaling factor should depend on k, \epsilon, and the sensitivity of that particular
+        # attribite. In this case, it's simply the range of the attribute.
+        for c in numerical_features:
+            lambda_ = (X[c].max()-X[c].min())/(k*epsilon)
+            w = np.random.laplace(scale=lambda_, size=n_data)
+            X[c] += w
+
+        self.fit(X, y, set_params=False)
     # set the interest rate
     def set_interest_rate(self, rate, refit=False):
         self.rate = rate
@@ -304,3 +329,23 @@ class NameBanker:
         # Convert Dataframe to array
         x = x.values
         return 1 if self.expected_utility(x,1) >= self.expected_utility(x,0) else 0
+
+    def get_private_best_action(self, x, epsilon):
+        def private_utility(action, best_action):
+            if action == best_action: return 0
+            else: return self.expected_utility(x.values, action) - \
+                         self.expected_utility(x.values, best_action)
+
+        sensitivity = self.utility(x['amount'], self.rate, x['duration'], 1) \
+                    - self.utility(x['amount'], self.rate, x['duration'], 2)
+        best_action = self.get_best_action(x)
+        u_qax = np.array([private_utility(0, best_action),
+                          private_utility(1, best_action)])
+        exponential = np.exp(epsilon*u_qax/sensitivity)
+        prob_keep_grant = exponential[1] / np.sum(exponential)
+        random_number = np.random.ranf(1)[0]
+        if best_action == 1:
+            # We would normally grant loan, but may flip the decision
+            return 0 if random_number > prob_keep_grant else 1
+        else:
+            return 1 if random_number > (1-prob_keep_grant) else 0
