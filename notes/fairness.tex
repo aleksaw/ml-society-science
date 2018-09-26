@@ -202,7 +202,7 @@
 
 \subsection{Fairness as independence}
 \begin{frame}
-  \only<article>{So how can we reframe the above fairness notions in a more precise way? Both of them involve conditional independence between $y, a$ and a sensitive attribute $z$, such as race. The first notion says that the actions of the judge (or equivalently, the scores of the algorithm) are \emph{calibrated} with respect to the outcomes. The second says that they are \emph{balanced}, so that were the outcome known to the judge, she would be making a decision independently of the defendant's race.}
+  \only<article>{So how can we reframe the above fairness notions in a more precise way? Both of them involve conditional independence between $y, a$ and a sensitive attribute $z$, such as race. The first notion says that the actions of the judge (or equivalently, the scores of the algorithm) are \emph{calibrated} with respect to the outcomes. The second says that they are \emph{balanced}, so that were the outcome known to the judge, she would be making a decision independently of the defendant's race. Both of these conditions were discussed in a more restricted setting by }
   \only<presentation>{
     \only<1>{
       \includegraphics[width=\columnwidth]{../figures/imrs}
@@ -254,11 +254,12 @@
     i.e. that $a$ is independent of $z$ given the true outcome $y$.\footnote{This definition only really makes sense when $y$ does not depend on $a$ at all. When this is not the case, it's easy to construct a random variable $y'$ that does not depend on $a$ so that $y$ can be written as a function $y(y', a)$. Then we can achieve balance with respect to $y'$.}
   }
 
-  \only<article>{In both cases, we defined conditional independence for a fixed probability distribution $P_\param(x,y,z)$ on the various variables. However, this cannot be assumed to be known.}
 \end{frame}
 
+
+  
 \subsection{Fairness as meritocracy.}
-\only<article>{A different concept of fairness is meritocracy. For example, if one candidate for a job is better than another, shouldn't that candidate be always preferred? How can we formalise this?}
+\only<article>{A different concept of fairness is meritocracy. For example, if one candidate for a job is better than another candidate, perhaps that candidate should be taken for the job.}
 
 
 \begin{frame}
@@ -303,7 +304,8 @@
 \end{frame}
 
 
-
+\subsection{Bayesian fairness}
+\only<article>{In both cases, we defined conditional independence for a fixed probability distribution $P_\param(x,y,z)$ on the various variables. However, this cannot be assumed to be known.}
 
 
 
