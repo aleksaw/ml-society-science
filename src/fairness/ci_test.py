@@ -34,7 +34,6 @@ for t in range(n_data):
         A[t] = 1
 
 
-
 ## Define a function for calculating the marginal likelihood $P(D|model)$
 ## This gives you the probability of all the data under the prior.
 ## Now you can use this to calculate a posterior over two possible beta priors.
@@ -55,7 +54,7 @@ def marginal_posterior(data, alpha, beta):
             beta +=1
     return np.exp(log_probability)
 
-            
+
 ## Now measure the distribution of A for each value of Y, for different values of Z
 ##
 n_figures = 0
@@ -78,19 +77,18 @@ for y in [-1, 1]:
     P_D_positive = marginal_posterior(A[positive], 1, 1)
     P_D_negative = marginal_posterior(A[negative], 1, 1)
     P_D = marginal_posterior(A[(Y==y)], 1, 1)
-    
-    
+
     print("Marginal likelihoods: ", P_D, P_D_negative, P_D_positive)
-    ## Now you need to calculate the probability of either the
+        ## Now you need to calculate the probability of either the
     ## dependent or independent model by combining all of the above
     ## into a single number.  This is not completely trivial, as you
     ## need to combine the negative and positive Z into it, but I
     ## think you can all work it out.
-    
-    
+
+
     print ("Now calculate a posterior distribution for the relevant Bernoulli parameter. Focus on just one value of y for simplicity")
 
-    
+
     # First plot the joint distribution
     prior_alpha = 1
     prior_beta = 1
@@ -103,8 +101,8 @@ for y in [-1, 1]:
     plt.clf()
     plt.plot(xplot, pdf_p)
     plt.plot(xplot, pdf_n)
-    plt.plot(xplot, pdf_m) 
+    plt.plot(xplot, pdf_m)
     plt.legend(["z=1", "z=-1", "marginal"])
     plt.title("y=" + str(y))
-    
-#plt.show()
+
+plt.show()
