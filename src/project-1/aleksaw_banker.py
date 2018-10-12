@@ -263,30 +263,7 @@ class NameBanker:
                                           fit(X, y),
                             LogisticRegression().fit(X_pca, y),
                             KNeighborsClassifier(n_neighbors=self.knn_k).fit(X, y)]
-    def private_fit(self, X, y, epsilon, numerical_features, binary_features, set_params=False):
-        n_data = len(X)
-        k = len(numerical_features) + len(binary_features)
 
-        flip_fraction = 1 / (1 + np.exp(epsilon/k))
-        # All non-numerical features are binary.
-        # What fraction should we flip to be epsilon-DP, given that there are k attributes in total?
-        # If we want to be epsilon-DP overall, then each feature should be \epsilon / k - DP.
-
-        # We can use the same random response mechanism for all binary features
-        w = np.random.choice([0, 1],
-                             size=(n_data, len(binary_features)),
-                             p=[1 - flip_fraction, flip_fraction])
-        X[binary_features] = (X[binary_features] + w) % 2
-
-        # For numerical features, it is different.
-        # The scaling factor should depend on k, \epsilon, and the sensitivity of that particular
-        # attribite. In this case, it's simply the range of the attribute.
-        for c in numerical_features:
-            lambda_ = (X[c].max()-X[c].min())/(k*epsilon)
-            w = np.random.laplace(scale=lambda_, size=n_data)
-            X[c] += w
-
-        self.fit(X, y, set_params=False)
     # set the interest rate
     def set_interest_rate(self, rate, refit=False):
         self.rate = rate
@@ -330,15 +307,53 @@ class NameBanker:
         x = x.values
         return 1 if self.expected_utility(x,1) >= self.expected_utility(x,0) else 0
 
-    def get_private_best_action(self, x, epsilon):
+class PrivateBanker(NameBanker):
+    # For non-default epsilon , epsilon should be numeric
+    def fit(self, X, y, epsilon='infinite', numerical_features='default',
+            binary_features='default', set_params=False):
+        if epsilon != 'infinite':
+            if numerical_features == 'default':
+                numerical_features = ['duration', 'age', 'residence time', 'installment', 'amount', 'duration', 'persons', 'credits']
+            if binary_features == 'default':
+                features = ['checking account balance', 'duration', 'credit history', 'purpose', 'amount', 'savings', 'employment', 'installment', 'marital status', 'other debtors', 'residence time', 'property', 'age', 'other installments', 'housing', 'credits', 'job', 'persons', 'phone', 'foreign']
+                binary_features = [f for f in features if f not in numerical_features]
+            n_data = len(X)
+            k = len(numerical_features) + len(binary_features)
+
+            flip_fraction = 1 / (1 + np.exp(epsilon/k))
+            # All non-numerical features are binary.
+            # What fraction should we flip to be epsilon-DP, given that there are k attributes in total?
+            # If we want to be epsilon-DP overall, then each feature should be \epsilon / k - DP.
+
+            # We can use the same random response mechanism for all binary features
+            w = np.random.choice([0, 1],
+                                 size=(n_data, len(binary_features)),
+                                 p=[1 - flip_fraction, flip_fraction])
+            X[binary_features] = (X[binary_features] + w) % 2
+
+            # For numerical features, it is different.
+            # The scaling factor should depend on k, \epsilon, and the sensitivity of that particular
+            # attribite. In this case, it's simply the range of the attribute.
+            for c in numerical_features:
+                lambda_ = (X[c].max()-X[c].min())/(k*epsilon)
+                w = np.random.laplace(scale=lambda_, size=n_data)
+                X[c] += w
+
+        super().fit(X, y, set_params=set_params)
+
+    # For non-default epsilon , epsilon should be numeric
+    def get_best_action(self, x, epsilon='infinite'):
+        if epsilon == 'infinite':
+            return super().get_best_action(x)
+
         def private_utility(action, best_action):
             if action == best_action: return 0
             else: return self.expected_utility(x.values, action) - \
                          self.expected_utility(x.values, best_action)
 
+        best_action = super().get_best_action(x)
         sensitivity = self.utility(x['amount'], self.rate, x['duration'], 1) \
                     - self.utility(x['amount'], self.rate, x['duration'], 2)
-        best_action = self.get_best_action(x)
         u_qax = np.array([private_utility(0, best_action),
                           private_utility(1, best_action)])
         exponential = np.exp(epsilon*u_qax/sensitivity)
