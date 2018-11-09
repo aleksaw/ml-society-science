@@ -23,7 +23,7 @@ class MarkovPolicy:
     def get_n_actions(self):
         return 2
 
-    
+
 class BasicModel:
     def __init__(self, mean):
         self.mean = mean
@@ -45,7 +45,7 @@ class StandardModel:
             y = self.get_response(a)
             hat_U += y
         return hat_U/n_samples
-    
+
 class CovariateModel:
     ## Now the mean is a 2x2 matrix
     def __init__(self, mean):
@@ -64,8 +64,8 @@ class CovariateModel:
         return hat_U/n_samples
 
 
-    
-    
+
+
 
 ### Get an estimate for theta for the simple model where the response is an additive function (in expectation) of theta and the action
 
@@ -88,7 +88,7 @@ def Exercise16():
     ## This corresponds to estimating the historical policy, the model parameters and the expected utility of that policy, with the only difference that the data here is generated online. So, the code could be used to estimate the utility of a new policy, if you had access to the model.
     ## Generate data
     for t in range(n_samples):
-        a[t] = int(policy.get_action()) 
+        a[t] = int(policy.get_action())
         y[t] = model.get_response(a[t])
 
     ## This part estimates the policy utility
@@ -102,9 +102,9 @@ def Exercise16():
     ## This part estimates the model
     for t in range(n_samples):
         counts[a[t]] += 1.0
-        hat_theta[a[t]] += y[t] # 
+        hat_theta[a[t]] += y[t] #
 
-        
+
     # Get the final estimates by normalising the counts
     hat_pi /= sum(hat_pi)
     hat_U/= n_samples
@@ -113,13 +113,13 @@ def Exercise16():
     print("Estimate parameters", hat_theta, "Policy:", hat_pi, "Utility:", hat_U)
     #sns.distplot(y)
     #plt.show()
-    
+
     ## How do we estimate the utility of some other policy pi?
 
     ## Method 1: Use importance sampling
     ## E_P U = \sum_x U(x) P(x) = \sum_x U(x) P(x)/Q(x) Q(x)
     ## Approximated by  \sum_t U(x_t)P(x_t)/Q(x_t) x_t \sim Q
-    
+
     ## This is how to estimate the utility of another policy using just the data.
     alt_pi = np.zeros(n_actions)
     alt_pi[np.argmax(hat_theta)] = 1
@@ -148,10 +148,12 @@ def Exercise16():
     alt_policy = BasicPolicy(hat_pi[1])
     print("Estimated Utility on Simulation:", model.Evaluate(policy, 10000), model.Evaluate(alt_policy, 10000))
 
-      
+
 ####### Exercise 17 #####
 
 if 1:
+    Exercise16()
+else:
     ### Set up the model
     theta = 0.1*np.random.normal(size=[2, 2])
     model = CovariateModel(theta)
