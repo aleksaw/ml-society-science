@@ -24,6 +24,13 @@ from recommender import Recommender
 
 class OptimisticRecommender(Recommender):
 
+    # Return a distribution of effects for a given person's data and a specific treatment.
+    # This should be an numpy.array of length self.n_outcomes
+    def predict_proba(self, data, treatment):
+        ret = np.zeros(self.n_outcomes)
+        ret[1] = 1
+        return ret
+
     # Return recommendations for a specific user datum
     # This should be an integer in range(self.n_actions)
     def recommend(self, user_data):

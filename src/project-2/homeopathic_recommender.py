@@ -22,12 +22,16 @@
 
 from recommender import Recommender
 
-import numpy as np
+class HomeopathicRecommender(Recommender):
 
-class HistoricalRecommender2(Recommender):
+    # Return a distribution of effects for a given person's data and a specific treatment.
+    # This should be an numpy.array of length self.n_outcomes
+    def predict_proba(self, data, treatment):
+        ret = np.zeros(self.n_outcomes)
+        ret[0] = 1
+        return ret
 
     # Return recommendations for a specific user datum
     # This should be an integer in range(self.n_actions)
     def recommend(self, user_data):
-        #print("Recommending")
-        return 1*(np.random.uniform() < user_data[0,128] * 0.4  + user_data[0,129] * 0.5);
+        return 0
