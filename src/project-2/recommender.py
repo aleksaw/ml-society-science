@@ -97,20 +97,20 @@ class Recommender:
         rskf = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats)
         split_sensitive = outcomes+self.n_outcomes*actions
         for train, test in tqdm(rskf.split(data, outcomes, split_sensitive)):
-            Xtr, Atr, Ytr = (data.iloc[train,:], actions.iloc[train,:], outcomes.iloc[train,:])
-            Xte, Ate, Yte = (data.iloc[test,:], actions.iloc[test,:], outcomes.iloc[test,:])
+            Xtr, Atr, Ytr = (data[train,:], actions[train,:], outcomes[train,:])
+            Xte, Ate, Yte = (data[test,:], actions[test,:], outcomes[test,:])
             policy.fit_treatment_outcome(Xtr, Atr, Ytr, quick=quick)
-            A_hat = np.array([policy.recommend(Xte.values[i,:]) for i in range(len(Xte))])
+            A_hat = np.array([policy.recommend(Xte[i,:]) for i in range(len(Xte))])
             # We only know the outcome in the cases where our recommendation
             # equals the historical action
-            acc += sum((Ate.values.ravel()==A_hat)) / len(A_hat)
+            acc += sum((Ate.ravel()==A_hat)) / len(A_hat)
             treated += sum(A_hat==1) / len(A_hat)
-            confusion += confusion_matrix(Ate.values.ravel(), A_hat)
+            confusion += confusion_matrix(Ate.ravel(), A_hat)
             p_a = np.bincount(A_hat) / len(A_hat)
             for a in range(self.n_actions):
-                mask = (Ate.values.ravel()==a) & (A_hat==a)
-                if len(Ate.iloc[mask].values) > 0:
-                    EU += utility(Ate.iloc[mask].values, Yte.iloc[mask].values) * p_a[a]
+                mask = (Ate.ravel()==a) & (A_hat==a)
+                if len(Ate[mask]) > 0:
+                    EU += utility(Ate[mask], Yte[mask]) * p_a[a]
         if output:
             print(f"Accuracy A vs historical A: {acc/(n_splits*n_repeats):.3f}")
             print(f"Treated: {treated/(n_splits*n_repeats):.3f}")

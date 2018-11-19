@@ -99,8 +99,8 @@ class ImprovedRecommender(Recommender):
         A = self.A
         Y = self.Y
         for a in range(self.n_actions):
-            X_A = self.X[(A==a).values[:,0],:]
-            Y_A = Y.iloc[(A==a).values[:,0],].values.ravel()
+            X_A = self.X[(A==a)[:,0],:]
+            Y_A = Y[(A==a)[:,0],].ravel()
 
             if Y_A.sum() == 0:
                 # We can't fit anything with only one class in data
@@ -176,9 +176,9 @@ class ImprovedRecommender(Recommender):
     # Observe the effect of an action. This is an opportunity for you
     # to refit your models, to take the new information into account.
     def observe(self, user, action, outcome):
-        self.X = self.X.append(self.scaler.transform(user.reshape(1,-1)))
-        self.A = self.A.append(actions)
-        self.Y = self.Y.append(outcome)
+        self.X = np.append(self.X, self.scaler.transform(user.reshape(1,-1)))
+        self.A = np.append(self.A, actions)
+        self.Y = np.append(self.Y, outcome)
         # Check how much we have increased out dataset and update models if necessary
         if self.X.shape[0] > self.refit_trigger * self.data_in_model:
             self._fit_models(quick=self.quick_fits)

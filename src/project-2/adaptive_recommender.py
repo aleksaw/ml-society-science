@@ -51,7 +51,7 @@ class AdaptiveRecommender(Recommender):
         self.w_alphas = np.ones((self.n_outcomes, self.n_actions, data.shape[1]))
         self.y_alphas = np.ones((self.n_outcomes, self.n_actions))
         for i in range(len(data)):
-            self.observe(data.iloc[i], actions.iloc[i], outcomes.iloc[i])
+            self.observe(data[i], actions[i], outcomes[i])
 
         #for o in range(self.n_outcomes):
         #    for a in range(self.n_actions):
@@ -107,6 +107,6 @@ class AdaptiveRecommender(Recommender):
         super().observe(user, action, outcome)
         # Scale down the count by the number of 1s. We don't know how many
         # or which features are responsible.
-        self.w_alphas[outcome, action, :] += user.values / user.sum()
+        self.w_alphas[outcome, action, :] += user / user.sum()
         self.y_alphas[outcome, action] += 1
         return None
