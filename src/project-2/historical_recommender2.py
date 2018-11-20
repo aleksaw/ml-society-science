@@ -28,6 +28,8 @@ class HistoricalRecommender2(Recommender):
 
     # Return recommendations for a specific user datum
     # This should be an integer in range(self.n_actions)
-    def recommend(self, user_data):
+    def recommend(self, user_data, exploring=0):
         #print("Recommending")
-        return 1*(np.random.uniform() < user_data[0,128] * 0.4  + user_data[0,129] * 0.5);
+        R = 1*(np.random.uniform() < user_data[128] * 0.4  + user_data[129] * 0.5);
+        self.obs_R = np.append(self.obs_R, R)
+        return R

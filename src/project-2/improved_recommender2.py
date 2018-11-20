@@ -104,7 +104,7 @@ class ImprovedRecommender2(Recommender):
     # Observe the effect of an action. This is an opportunity for you
     # to refit your models, to take the new information into account.
     def observe(self, user, action, outcome):
-        super.observe(user, action, outcome)
+        super().observe(user, action, outcome)
         # Scale down the count by the number of 1s. We don't know how many
         # or which features are responsible.
         self.w_alphas[outcome, action, :] += user.values / user.sum()

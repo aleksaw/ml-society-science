@@ -35,14 +35,8 @@ class HistoricalRecommender(Recommender):
 
     # Return recommendations for a specific user datum
     # This should be an integer in range(self.n_actions)
-    def recommend(self, user_data):
+    def recommend(self, user_data, exploring=0):
         # If user is in dataset, this should be max_features
-        #print(self.X.columns)
-        #print(user_data.columns)
-        #print(user_data)
-        #print(user_data.shape)
-        #print(self.X.shape)
-        #print(self.X == user_data)
         equal_elements = (self.X.values == user_data).sum(axis=1)
         # So if we knew that there were only one of each, and that we always
         # looked up that one, this could be skipped.
@@ -51,4 +45,6 @@ class HistoricalRecommender(Recommender):
         users = self.X[equal_elements == max_equal_elements]
         # If there are more historical users with identically close fit
         # we choose randomly among them.
-        return np.random.choice(self.A[self.A.index.isin(users.index)].values.ravel())
+        R = np.random.choice(self.A[self.A.index.isin(users.index)].values.ravel())
+        self.obs_R = np.append(self.obs_R, R)
+        return R

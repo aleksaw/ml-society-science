@@ -33,5 +33,10 @@ class OptimisticRecommender(Recommender):
 
     # Return recommendations for a specific user datum
     # This should be an integer in range(self.n_actions)
-    def recommend(self, user_data):
-        return 1
+    def recommend(self, user_data, exploring=0):
+        if exploring > np.random.random():
+            R = np.random.choice(np.arange(self.n_actions), p=self.get_action_probabilities(user_data))
+        else:
+            R = 1
+        self.obs_R = np.append(self.obs_R, R)
+        return R

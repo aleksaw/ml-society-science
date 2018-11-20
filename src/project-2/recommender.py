@@ -67,8 +67,14 @@ class Recommender:
     def fit_treatment_outcome(self, data, actions, outcomes, quick=False):
         #print("Fitting treatment outcomes")
         self.X = data
-        self.A = actions
-        self.Y = outcomes
+        self.A = actions.ravel()
+        self.Y = outcomes.ravel()
+
+        self.obs_R = np.zeros(0, dtype=np.int)
+        self.obs_X = np.zeros((0, data.shape[1]))
+        self.obs_A = np.zeros(0, dtype=np.int)
+        self.obs_Y = np.zeros(0, dtype=np.int)
+
         return None
 
 
@@ -135,26 +141,31 @@ class Recommender:
 
     # Return recommendations for a specific user datum
     # This should be an integer in range(self.n_actions)
-    def recommend(self, user_data, exploring=False):
+    def recommend(self, user_data, exploring=0):
         #print("Recommending")
-        # The not exploring might give the best results, but it also will
-        # probably never assign placebo treatment given the data we have now.
-        # Exploring an option that reduces that problem
-
-        if exploring:
-            return np.random.choice(np.arange(self.n_actions), p=self.get_action_probabilities(user_data))
+        if exploring > np.random.random():
+            R = np.random.choice(np.arange(self.n_actions), p=self.get_action_probabilities(user_data))
         else:
-            return np.argmax(self.get_action_probabilities(user_data))
+            R =  np.argmax(self.get_action_probabilities(user_data))
+
+        self.obs_R = np.append(self.obs_R, R)
+        return R
 
 
 
     # Observe the effect of an action. This is an opportunity for you
     # to refit your models, to take the new information into account.
     def observe(self, user, action, outcome):
-        self.X = np.append(self.X, user)
+        self.X = np.append(self.X, user.reshape(1,-1), axis=0)
         self.A = np.append(self.A, action)
         self.Y = np.append(self.Y, outcome)
+        self._store_observation(user, action, outcome)
         return None
+
+    def _store_observation(self, user, action, outcome):
+        self.obs_X = np.append(self.obs_X, user.reshape(1,-1))
+        self.obs_A = np.append(self.obs_A, action)
+        self.obs_Y = np.append(self.obs_Y, outcome)
 
     # After all the data has been obtained, do a final analysis. This can consist of a number of things:
     # 1. Recommending a specific fixed treatment policy
@@ -162,4 +173,19 @@ class Recommender:
     # 3. Showing whether or not the new treatment might be better than the old, and by how much.
     # 4. Outputting an estimate of the advantage of gene-targeting treatments versus the best fixed treatment
     def final_analysis(self):
+        if (self.obs_R == self.obs_A).sum() < len(self.obs_R):
+            # These should all be equal, if they aren't I don't know where the
+            # data is coming from
+            print("Compromised data")
+        else:
+            actioncounts = np.bincount(self.obs_A, minlength=self.n_actions)
+            print("Actions by count: {}".format(actioncounts))
+            success_by_action = np.zeros(self.n_actions)
+            for i in range(len(self.obs_A)):
+                success_by_action[self.obs_A[i]] += self.obs_Y[i]
+            print("Successrate by action: {}".format(success_by_action / actioncounts))
+            mean_r = (success_by_action-0.1*actioncounts) / actioncounts
+            print("Mean reward by action {}".format(mean_r))
+            print("Matrix of actions vs outcomes, outcome is row, action is column")
+            print(confusion_matrix(self.obs_Y, self.obs_A)[:self.n_outcomes, :self.n_actions])
         return None

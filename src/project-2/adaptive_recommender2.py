@@ -22,9 +22,10 @@
 
 from recommender import Recommender
 
+from sklearn.model_selection import RepeatedStratifiedKFold
 import numpy as np
 
-class AdaptiveRecommender(Recommender):
+class AdaptiveRecommender2(Recommender):
 
     #################################
     # Initialise
@@ -47,13 +48,13 @@ class AdaptiveRecommender(Recommender):
         #print("Fitting treatment outcomes")
         super().fit_treatment_outcome(data, actions, outcomes)
         # alphas of Dirichlet distributions
-        self.w_alphas = np.ones((self.n_outcomes, self.n_actions, data.shape[1]))
+        self.x_alphas = np.ones((self.n_outcomes, self.n_actions, data.shape[1]))
         self.y_alphas = np.ones((self.n_outcomes, self.n_actions))
-        for i in range(len(data)):
-            # Scale down the count by the number of 1s. We don't know how many
-            # or which features are responsible.
-            self.w_alphas[outcome, action, :] += user / user.sum()
-            self.y_alphas[outcome, action] += 1
+        for o in range(self.n_outcomes):
+            for a in range(self.n_actions):
+                mask = (self.A==a).ravel() & (self.Y==o).ravel()
+                self.x_alphas[o, a, :] += data[mask].sum(axis=0)
+                self.y_alphas[o, a] += mask.sum()
 
         return None
 
@@ -61,20 +62,11 @@ class AdaptiveRecommender(Recommender):
     # This should be an numpy.array of length self.n_outcomes
     def predict_proba(self, data, treatment):
         a = treatment
-        # Draw random samples representing the w's in the a-row of W-matrix
-        samples = np.array([np.random.dirichlet(self.w_alphas[:,a,i], self.n_draws)
-                            for i in range(self.w_alphas.shape[2])])
-        # Center each row of w's
-        samples -= samples.mean(axis=0)
-        # Find the estimated probability of healing given the action
-        p_y_a = np.random.dirichlet(self.y_alphas[:,a], self.n_draws)
-        # Calculating what we compare, it's not a probability, but we choose
-        # outcome with the value, p_y_a adjusted according to data.
-        p_ish_y_ax = np.dot(samples.T, data.ravel()).T * p_y_a
-        # For each sample, choose the most likely outcome
-        y_hats = np.argmax(p_ish_y_ax, axis=1)
-        # See how many of each outcome, and convert to probabilities
-        return np.bincount(y_hats, minlength=self.n_outcomes) / self.n_draws
+        log_x_means = self.x_alphas[:,a,:] / self.x_alphas[:,a,:].sum(axis=0)
+        log_p_x_ya = np.dot(np.log(log_x_means), data)
+        log_y_a = np.log(self.y_alphas[:,a] / self.y_alphas[:,a].sum(axis=0))
+        p_y_xa = np.exp(log_p_x_ya + log_y_a - log_p_x_ya.mean())
+        return p_y_xa / p_y_xa.sum()
 
     # Observe the effect of an action. This is an opportunity for you
     # to refit your models, to take the new information into account.
@@ -82,6 +74,6 @@ class AdaptiveRecommender(Recommender):
         super().observe(user, action, outcome)
         # Scale down the count by the number of 1s. We don't know how many
         # or which features are responsible.
-        self.w_alphas[outcome, action, :] += user / user.sum()
+        self.x_alphas[outcome, action, :] += user
         self.y_alphas[outcome, action] += 1
         return None
