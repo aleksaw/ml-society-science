@@ -11,7 +11,7 @@ def test_policy(generator, policy, reward_function, T):
     u = 0
     for t in tqdm(range(T)):
         x = generator.generate_features()
-        a = policy.recommend(x, exploring=0.2)
+        a = policy.recommend(x, strategy='backinduction')
         y = generator.generate_outcome(x, a)
         r = reward_function(a, y)
         u += r
@@ -27,19 +27,25 @@ observations = features[:, :128]
 labels = features[:,128] + features[:,129]*2
 
 import data_generation
-import random_recommender, historical_recommender, historical_recommender2
-import historical_recommender3, optimistic_recommender, homeopathic_recommender
-import improved_recommender, adaptive_recommender, adaptive_recommender2
-policy_factories = [#random_recommender.RandomRecommender,
-                    #historical_recommender2.HistoricalRecommender2,
-                    #historical_recommender3.HistoricalRecommender3,
-                    #optimistic_recommender.OptimisticRecommender,
-                    #homeopathic_recommender.HomeopathicRecommender,
-                    #improved_recommender.ImprovedRecommender,
-                    adaptive_recommender2.AdaptiveRecommender2]
+from noncontextual_recommenders import RandomRecommender, OptimisticRecommender, HomeopathicRecommender
+from historical_recommender import HistoricalRecommender, HistoricalRecommender2, HistoricalRecommender3
+from adaptive_recommender import AdaptiveRecommender, AdaptiveRecommender2, AdaptiveRecommender3
+from improved_recommender import ImprovedRecommender
+from improved_adaptive_recommender import ImprovedAdaptiveRecommender
+policy_factories = [#RandomRecommender,
+                    #HistoricalRecommender2,
+                    #HistoricalRecommender3,
+                    #OptimisticRecommender,
+                    #HomeopathicRecommender,
+                    #ImprovedRecommender,
+                    #AdaptiveRecommender,
+                    #AdaptiveRecommender2,
+                    #AdaptiveRecommender3,
+                    ImprovedAdaptiveRecommender]
 
-policy_names = ['Random', 'Historical2', 'Historical3',
-                'Optimistic', 'Homeopathic', 'Improved', 'Adaptive']
+policy_names = [#'Random', 'Historical2', 'Historical3', 'Optimistic',
+                #'Homeopathic', 'Improved','Adaptive', 'Adaptive2', 'Adaptive3',
+                'Improved Adaptive']
 #import reference_recommender
 #policy_factory = reference_recommender.RandomRecommender
 
@@ -57,12 +63,13 @@ for i, policy_factory in enumerate(policy_factories):
     policy.fit_treatment_outcome(features, actions, outcome)
     ## Run an online test with a small number of actions
     print("Running online tests")
-    for n_tests in np.logspace(4, 4, 1):
+    """
+    for n_tests in np.logspace(2, 4.3, 5):
         print('Number of tests: {}'.format(int(n_tests)))
         result = test_policy(generator, policy, default_reward_function, int(n_tests))
         print("Average reward: {:.3f}".format(result/n_tests))
         print("Final analysis of results")
-        policy.final_analysis()
+        policy.final_analysis()"""
 
     ## First test with the same number of treatments
     print("--- Testing with an additional experimental treatment and 126 gene silencing treatments ---")
@@ -75,7 +82,7 @@ for i, policy_factory in enumerate(policy_factories):
     policy.fit_treatment_outcome(features, actions, outcome)
     ## Run an online test with a small number of actions
     print("Running online tests")
-    for n_tests in np.logspace(4, 4, 1):
+    for n_tests in np.logspace(2, 4.3, 5):
         print('Number of tests: {}'.format(int(n_tests)))
         result = test_policy(generator, policy, default_reward_function, int(n_tests))
         print("Average reward: {:.3f}".format(result/n_tests))
