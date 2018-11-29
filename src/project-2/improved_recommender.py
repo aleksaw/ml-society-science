@@ -1,4 +1,8 @@
 """ Improved Recommender """
+import warnings
+from sklearn.exceptions import DataConversionWarning
+# We get useless DataConversionWarning from StandardScaler
+warnings.filterwarnings("ignore", category=DataConversionWarning)
 
 from recommender import Recommender
 
@@ -66,8 +70,8 @@ class ImprovedRecommender(Recommender):
         #print("Fitting treatment outcomes")
         super().fit_treatment_outcome(data, actions, outcomes)
         self.X = self.scaler.fit_transform(data)
-        self.model = [None for _ in range(self.n_actions)]
-        self._fit_models(quick=quick)
+        self.model = [self._fit_model(a, quick=quick)
+                      for a in range(self.n_actions)]
 
         return None
 
@@ -81,15 +85,15 @@ class ImprovedRecommender(Recommender):
 
         Parameters
         ----------
-        data : np.ndarray(n_observation, n_features)
-            The historical data to find pattern in
-        actions: np.ndarray(n_observations)
-            The actions taken by historical recommender
-        outcomes: np.ndarray(n_observations)
-            The outcomes of those actions
+        action: int
+            The action to fit a model for
         quick: bool
             Whether or not to fit quickly.
             Defaults to True
+
+        Returns
+        ----------
+        Classifier: A classifier for the action
         """
         self.data_in_model = self.X.shape[0]
         a = action
@@ -126,54 +130,48 @@ class ImprovedRecommender(Recommender):
             def predict_proba(self, data):
                 return self.p
 
-        A = self.A
-        Y = self.Y
-        for a in range(self.n_actions):
-            X_A = self.X[(A==a),:]
-            Y_A = Y[(A==a)]
-            smallest_class_of_outcomes = np.min(np.bincount(Y_A, minlength=self.n_outcomes))
+        X_A = self.X[(self.A==a),:]
+        Y_A = self.Y[(self.A==a)]
+        smallest_class_of_outcomes = np.min(np.bincount(Y_A, minlength=self.n_outcomes))
 
-            if smallest_class_of_outcomes == 0:
-                # We can't fit anything with only one class in data
-                ps = np.append([1], np.zeros(self.n_outcomes-1))
-                self.model[a] = DummyClassifier(ps)
-                continue
+        if smallest_class_of_outcomes == 0:
+            # We can't fit anything with only one class in data
+            ps = np.append([1], np.zeros(self.n_outcomes-1))
+            return DummyClassifier(ps)
 
-            if smallest_class_of_outcomes < quick_trigger:
-                # We're likely to run into trouble fitting classifier in
-                # KFold, so we drop that.
-                quick = True
+        if smallest_class_of_outcomes < quick_trigger:
+            # We're likely to run into trouble fitting classifier in
+            # KFold, so we drop that.
+            quick = True
 
-            if quick:
-                self.model[a] = LogisticRegression(C=quick_c, solver='lbfgs', max_iter=2000).fit(X_A, Y_A)
-                continue
+        if quick:
+            return LogisticRegression(C=quick_c, solver='lbfgs', max_iter=2000).fit(X_A, Y_A)
 
-            if Y_A.sum() < acc_rr_threshold * len(Y_A):
-                measure = acc_rr
-            else:
-                measure = accuracy_score
+        if Y_A.sum() < acc_rr_threshold * len(Y_A):
+            measure = acc_rr
+        else:
+            measure = accuracy_score
 
-            n_folds = 10 if len(Y_A) > FiveFold_threshold else 5
-            n_repeats = round(fits / n_folds)
-            accuracies = np.zeros(len(Cs))
-            for i, c in enumerate(Cs):
-                accuracy = np.zeros(n_folds * n_repeats)
-                j = 0
-                rskf = RepeatedStratifiedKFold(n_splits=n_folds, n_repeats=n_repeats)
-                for train, test in rskf.split(X=X_A, y=Y_A, groups=Y_A):
-                    Xtr, ytr = (X_A[train,], Y_A[train])
-                    Xte, yte = (X_A[test,], Y_A[test])
-                    y_pred = LogisticRegression(C=c, solver='lbfgs', max_iter=2000).fit(Xtr, ytr).predict(Xte)
-                    accuracy[j] = measure(y_pred, yte)
-                    j += 1
-                accuracies[i] = np.mean(accuracy)
+        n_folds = 10 if len(Y_A) > FiveFold_threshold else 5
+        n_repeats = round(fits / n_folds)
+        accuracies = np.zeros(len(Cs))
+        for i, c in enumerate(Cs):
+            accuracy = np.zeros(n_folds * n_repeats)
+            j = 0
+            rskf = RepeatedStratifiedKFold(n_splits=n_folds, n_repeats=n_repeats)
+            for train, test in rskf.split(X=X_A, y=Y_A, groups=Y_A):
+                Xtr, ytr = (X_A[train,], Y_A[train])
+                Xte, yte = (X_A[test,], Y_A[test])
+                y_pred = LogisticRegression(C=c, solver='lbfgs', max_iter=2000).fit(Xtr, ytr).predict(Xte)
+                accuracy[j] = measure(y_pred, yte)
+                j += 1
+            accuracies[i] = np.mean(accuracy)
 
-            # I'll go with highest accuracy. We could have gone most parsimonious
-            # within 1se f.ex, but test indicate less regularization is better.
-            best_c = Cs[np.argmax(accuracies)]
-            self.model[a] = LogisticRegression(C=best_c, solver='sag').fit(X_A, Y_A)
+        # I'll go with highest accuracy. We could have gone most parsimonious
+        # within 1se f.ex, but test indicate less regularization is better.
+        best_c = Cs[np.argmax(accuracies)]
+        return LogisticRegression(C=best_c, solver='sag').fit(X_A, Y_A)
 
-        return None
 
 
     def predict_proba(self, user: np.ndarray, treatment: int) -> np.ndarray:
@@ -194,6 +192,7 @@ class ImprovedRecommender(Recommender):
         np.ndarray(n_outcomes)
             The probability of each outcome given the data and the treatment
         """
+        return self.model[treatment].predict_proba(user.reshape(1,-1))
 
     def observe(self, user: np.ndarray, action: int, outcome: int) -> None:
         """ Observe the effect of an action.
@@ -217,5 +216,6 @@ class ImprovedRecommender(Recommender):
         super()._store_observation(user, action, outcome)
         # Check how much we have increased out dataset and update models if necessary
         if self.X.shape[0] > self.refit_trigger * self.data_in_model:
-            self._fit_models(quick=self.quick_fits)
+            self.model = [self._fit_model(a, quick=self.quick_fits)
+                          for a in range(self.n_actions)]
         return None

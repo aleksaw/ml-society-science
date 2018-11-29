@@ -102,6 +102,7 @@ class HistoricalRecommender2(Recommender):
         #print("Recommending")
         R = 1*(np.random.uniform() < user_data[128] * 0.4  + user_data[129] * 0.5);
         self.obs_R = np.append(self.obs_R, R)
+        self.obs_Explore = np.append(self.obs_Explore, 0)
         return R
 
 
@@ -109,8 +110,7 @@ class HistoricalRecommender2(Recommender):
 class HistoricalRecommender3(Recommender):
     """ A historical recommender trying to mimick the historical decisions """
 
-    def __init__(self, n_actions: int, n_outcomes: int,
-                     refit_trigger: float=1.1) -> Recommender:
+    def __init__(self, n_actions: int, n_outcomes: int) -> Recommender:
         """ Initialize the class
 
         Set the recommender with a default number of actions and outcomes.
@@ -123,8 +123,6 @@ class HistoricalRecommender3(Recommender):
             Number of possible actions to take
         n_outcomes : int
             Number of possible outcomes
-        refit_trigger: float
-            A number specifying the increase in data before we refit the model
 
         Returns
         -------
@@ -134,7 +132,6 @@ class HistoricalRecommender3(Recommender):
         self.n_actions = n_actions
         self.n_outcomes = n_outcomes
         self.reward = self._default_reward
-        self.refit_trigger = 1.1
 
     def fit_treatment_outcome(self, data: np.ndarray, actions: np.ndarray,
                               outcomes: np.ndarray, quick: bool=True) -> None:
@@ -176,9 +173,11 @@ class HistoricalRecommender3(Recommender):
         """
         # We have to find some weights that balance the fact that we have
         # more placebo than treatment actions in history.
-        weights = {0: np.mean(self.A)*2, 1: (1-np.mean(self.A))}
-        self.model = LogisticRegression(C=100000., solver='lbfgs', class_weight=weights)
-        self.model.fit(self.X, self.A.ravel())
+        # weights = {0: np.mean(self.A)*2, 1: (1-np.mean(self.A))}
+        # self.model = LogisticRegression(C=100000., solver='lbfgs',
+        #                                class_weight=weights, max_iter=2000)
+        self.model = LogisticRegression(C=100000., solver='lbfgs', max_iter=2000)
+        self.model.fit(self.X, self.A)
         return None
 
 
@@ -203,4 +202,5 @@ class HistoricalRecommender3(Recommender):
         #print("Recommending")
         R = self.model.predict(user_data.reshape(1,-1))[0]
         self.obs_R = np.append(self.obs_R, R)
+        self.obs_Explore = np.append(self.obs_Explore, 0)
         return R

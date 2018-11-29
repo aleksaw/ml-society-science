@@ -11,7 +11,7 @@ def test_policy(generator, policy, reward_function, T):
     u = 0
     for t in tqdm(range(T)):
         x = generator.generate_features()
-        a = policy.recommend(x, strategy='backinduction')
+        a = policy.recommend(x, exploring=0.4, strategy='epsilon')
         y = generator.generate_outcome(x, a)
         r = reward_function(a, y)
         u += r
@@ -82,7 +82,7 @@ for i, policy_factory in enumerate(policy_factories):
     policy.fit_treatment_outcome(features, actions, outcome)
     ## Run an online test with a small number of actions
     print("Running online tests")
-    for n_tests in np.logspace(2, 4.3, 5):
+    for n_tests in np.logspace(4.5, 5.5, 3):
         print('Number of tests: {}'.format(int(n_tests)))
         result = test_policy(generator, policy, default_reward_function, int(n_tests))
         print("Average reward: {:.3f}".format(result/n_tests))

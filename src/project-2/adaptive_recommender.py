@@ -9,7 +9,7 @@ class AdaptiveRecommender(Recommender):
 
     It does this by counting up as a set of Dirichlet
     (or when n_outcomes=2, Beta) distributions the number of each outcome
-    where each feature is present. We then center these so that they monthly
+    where each feature is present. We then center these so that they mostly
     say something about the importance of the features. The non-contextual
     probability of each outcome is modeled as a separate Dirichlet distribution.
     The estimated probability of each outcome is then a combination of

@@ -20,10 +20,14 @@ There is an analysis function
 - final_analysis
 """
 
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from cycler import cycler
+
 from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.metrics import confusion_matrix
-import numpy as np
-from typing import Callable
+from typing import Callable, Dict
 
 from tqdm import tqdm # For progress bar during estimation
 
@@ -387,7 +391,7 @@ class Recommender:
         self.obs_Y = np.append(self.obs_Y, outcome)
 
 
-    def final_analysis(self) -> None:
+    def final_analysis(self, quiet: bool=False) -> Dict[str, np.ndarray]:
         """ Perform final analysis on the policy
 
         After all the data has been obtained, do a final analysis. This can
@@ -403,13 +407,16 @@ class Recommender:
             # These should all be equal, if they aren't I don't know where the
             # data is coming from
             print("Compromised data")
-        else:
+            return None
+
+        if not quiet:
             actioncounts = np.bincount(self.obs_A, minlength=self.n_actions)
             print("Actions by count: {}".format(actioncounts))
             success_by_action = np.zeros(self.n_actions)
             for i in range(len(self.obs_A)):
                 success_by_action[self.obs_A[i]] += self.obs_Y[i]
             print("Successrate by action: {}".format(success_by_action / actioncounts))
+            # For simplicity I hardcoses the reward function -0.1*I(a>0)+y
             penalties = np.zeros(self.n_actions); penalties[1:] += 0.1
             mean_r = (success_by_action-penalties*actioncounts) / actioncounts
             print("Mean reward by action {}".format(mean_r))
@@ -421,4 +428,78 @@ class Recommender:
             for a, e in zip(self.obs_R, self.obs_Explore):
                 a_by_explr[a] += e
             print(a_by_explr)
-        return None
+
+        # Plot nice graphs representing these numbers graphically.
+        # actions successes, exploration, etc as time goes by.
+        successes = np.zeros((self.n_actions, len(self.obs_R)))
+        actions = np.zeros((self.n_actions, len(self.obs_R)))
+        mean_utility = np.zeros((self.n_actions, len(self.obs_R)))
+        exploration = np.zeros((self.n_actions, len(self.obs_R)))
+        exploit_success = np.zeros((self.n_actions, len(self.obs_R)))
+        for i, a in enumerate(self.obs_R):
+            successes[a,i] += self.obs_Y[i]
+            actions[a,i] += 1
+            mean_utility[a,i] = (mean_utility[a,i] * (actions[a,i]-1) + \
+                                 self.reward(a, self.obs_Y[i])) / actions[a,i]
+            exploration[a,i] += self.obs_Explore[i]
+            exploit_success[a,i] += 1*(self.obs_Y[i]==1 and self.obs_Explore[i]==0)
+            if i+1 < len(self.obs_R):
+                successes[:,i+1] = successes[:,i]
+                actions[:,i+1] = actions[:,i]
+                mean_utility[:,i+1] = mean_utility[:,i]
+                exploration[:,i+1] = exploration[:,i]
+                exploit_success[:,i+1] = exploit_success[:,i]
+
+        success_rate = np.divide(successes, actions,
+                                 out=np.zeros_like(actions),
+                                 where=actions!=0)
+        exploit = (actions - exploration)
+        exploit_success_rate = np.divide(exploit_success, exploit,
+                                         out=np.zeros_like(exploit),
+                                         where=exploit!=0)
+        mean_total_utility = (mean_utility*actions).sum(axis=0) / \
+                             np.arange(1, len(self.obs_R)+1)
+        if not quiet:
+            # Plot graphs
+            epochs = list(range(len(self.obs_R)))
+            data = [successes, actions, exploration, success_rate,
+                    exploit_success_rate, mean_utility]
+            log_scale = [True, True, True, False, False, False]
+            plot_title = ['Successes for each treatment',
+                          'Actions for each treatment',
+                          'Actions taken for exploration',
+                          'Rate of success of treatments',
+                          'Rate of success of treatment when exploiting',
+                          'Mean utility for treatment']
+            action_labels = ['_' for _ in range(min(3,self.n_actions))]
+            action_labels[0] = 'Placebo'
+            action_labels[1] = 'Old'
+            if self.n_actions > 2:  action_labels[2] = 'New'
+
+            sns.set()
+            plt.rcParams['figure.figsize'] = [20, 14]
+            col1 = sns.color_palette("bright", 4)[1:]
+            col2 = sns.color_palette("Blues_d", self.n_actions-3)
+            plt.rcParams['axes.prop_cycle'] = cycler(color=(col1+col2))
+            fig, axs = plt.subplots(4, 2)
+            for i in range(len(data)):
+                r = i % 3;      c = i // 3
+                axs[r,c].plot(epochs, data[i].T)
+                axs[r,c].legend(action_labels)
+                axs[r,c].set_title(plot_title[i])
+                if log_scale[i]:
+                    axs[r,c].set_yscale('log')
+                    axs[r,c].set_ylim(bottom=0.3)
+            axs[3,1].plot(epochs, mean_total_utility)
+            axs[3,1].set_title('Mean total utility over time')
+
+            plt.tight_layout()
+            plt.savefig('final_analysis.png')
+            plt.show()
+
+        dict = { 'successes': successes, 'actions': actions,
+                 'exploration': exploration, 'success_rate': success_rate,
+                 'mean_utility': mean_utility,
+                 'exploit_success_rate': exploit_success_rate,
+                 'mean_total_utility': mean_total_utility }
+        return dict

@@ -61,7 +61,6 @@ class ImprovedAdaptiveRecommender(Recommender):
             Defaults to True
         """
         #print("Fitting treatment outcomes")
-        #self.data_in_model = np.zeros(self.n_actions)
         super().fit_treatment_outcome(data, actions, outcomes)
         self.model = [self._fit_model(a, quick=quick)
                       for a in range(self.n_actions)]
@@ -117,7 +116,6 @@ class ImprovedAdaptiveRecommender(Recommender):
             return (tp / (tp+fp+fn)) if (tp+fp+fn)>0 else 1
 
 
-        #self.data_in_model[a] = self.X[self.A==a].shape[0]
         X_A = self.X[(self.A==a),:]
         Y_A = self.Y[(self.A==a)]
         smallest_class_of_outcomes = np.min(np.bincount(Y_A, minlength=self.n_outcomes))
@@ -256,7 +254,10 @@ class ImprovedAdaptiveRecommender(Recommender):
                 # The depth of the backwards induction. I.e. how far into the
                 # future to try to look. Beware, complexity is exponential.
                 # Looking deep will take long.
-                depth = 1
+                updates_per_level = self.n_actions * self.n_outcomes
+                max_updates = 300
+                # upl**depth=updates<max_updates => depth<log(mu)/log(upl)
+                depth = np.floor(np.log(max_updates) / np.log(updates_per_level))
                 # The horizon to maximize for. This will influence the value of
                 # exploring vs exploiting.
                 horizon = 100
@@ -272,7 +273,6 @@ class ImprovedAdaptiveRecommender(Recommender):
                     return ret
 
                 def backwards_induction(priors, depth, T):
-                    #print(f"{depth}: {priors}")
                     EU = np.zeros(len(priors))
                     for a, p in enumerate(priors):
                         prob = p.predict_proba(user_data.reshape(1,-1))[1]
@@ -290,7 +290,6 @@ class ImprovedAdaptiveRecommender(Recommender):
                     return EU.max(), np.argmax(EU) # Expected Utility, Action
 
                 # Get results from induction and make recommendation
-                #print(len(self.model))
                 EU, R = backwards_induction(self.model, depth, horizon)
             else:
                 return super().recommend(user_data, exploring=1.0, strategy=strategy)
@@ -328,13 +327,10 @@ class ImprovedAdaptiveRecommender(Recommender):
             smallest_class_of_outcomes = np.min(np.bincount(self.Y[self.A==action], minlength=self.n_outcomes))
             if smallest_class_of_outcomes > 0:
                 self.model[action] = self._fit_model(action, quick=self.quick_fits)
-                #return None
-        #data_for_model = self.X[self.A==action].shape[0]
-        #if self.model[action].data_for_model > self.refit_trigger * self.model[action].data_in_model:
-            #self.model[action] = self._fit_model(action, quick=self.quick_fits)
+
         return None
 
-    def final_analysis(self) -> None:
+    def final_analysis(self, quiet: bool=False) -> None:
         """ Perform final analysis on the policy
 
         After all the data has been obtained, do a final analysis. This can
@@ -346,16 +342,13 @@ class ImprovedAdaptiveRecommender(Recommender):
         4.  Outputting an estimate of the advantage of gene-targeting
             treatments versus the best fixed treatment
         """
-        if (self.obs_R == self.obs_A).sum() < len(self.obs_R):
-            # These should all be equal, if they aren't I don't know where the
-            # data is coming from
-            print("Compromised data")
-        else:
-            super().final_analysis()
-            model_is_NC = [getattr(self.model[a], 'non_contextual', False))
+        if not quiet:
+            model_is_NC = [getattr(self.model[a], 'non_contextual', False)
                            for a in range(self.n_actions)]
             lrs = self.n_actions - sum(model_is_NC)
             print("Logistic Recommenders: {}".format(lrs))
+        return super().final_analysis(quiet=quiet)
+
 
 
 class LogisticClassifier:
